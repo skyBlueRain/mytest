@@ -100,8 +100,7 @@ function handleMessage(msg) {
   }
 }
 
-let connectAttempts = 0
-let connectTimer = null
+let reconnectTimer = null
 
 function connect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
@@ -109,14 +108,17 @@ function connect() {
   state.error = ''
   ws.onopen = () => {
     state.connected = true
-    connectAttempts = 0
+    if (!state.inLobby) {
+      state.error = ''
+    }
   }
   ws.onclose = () => {
     state.connected = false
-    state.error = '与服务器断开'
     if (!state.inLobby && !state.gameOver) {
-      showOverlay('连接已断开', '请刷新页面重试', null)
+      showOverlay('连接已断开', '正在自动重连...', null)
     }
+    clearTimeout(reconnectTimer)
+    reconnectTimer = setTimeout(connect, 3000)
   }
   ws.onmessage = (e) => handleMessage(JSON.parse(e.data))
 }
@@ -167,6 +169,7 @@ function requestRestart() {
 }
 
 function leave() {
+  clearTimeout(reconnectTimer)
   ws?.close()
   ws = null
   state.connected = false
