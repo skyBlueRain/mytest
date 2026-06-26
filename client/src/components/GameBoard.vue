@@ -139,11 +139,15 @@ function handleClick(e) {
 .room-badge {
   background: #5c3a1e;
   color: #fff;
-  padding: 4px 12px;
+  padding: 6px 16px;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: bold;
+  letter-spacing: 2px;
+  cursor: pointer;
+  user-select: all;
 }
+.room-badge:hover { background: #7a4f2e; }
 .turn-indicator {
   color: #5c3a1e;
   font-size: 18px;

@@ -90,16 +90,21 @@ function handleMessage(ws, raw) {
   try { msg = JSON.parse(raw); } catch { return; }
 
   if (msg.type === 'create_room') {
-    const roomId = generateRoomId();
-    rooms.set(roomId, {
+    let roomCode = (msg.roomCode || '').trim();
+    if (!roomCode) roomCode = generateRoomId();
+    if (rooms.has(roomCode)) {
+      send(ws, { type: 'error', message: '房间号已存在' });
+      return;
+    }
+    rooms.set(roomCode, {
       players: [ws],
       board: createBoard(),
       turn: 1,
       state: 'waiting',
     });
-    ws.roomId = roomId;
+    ws.roomId = roomCode;
     ws.playerIndex = 0;
-    send(ws, { type: 'room_created', roomId });
+    send(ws, { type: 'room_created', roomId: roomCode });
     return;
   }
 
@@ -119,8 +124,8 @@ function handleMessage(ws, raw) {
     room.state = 'playing';
 
     // Notify both players
-    send(room.players[0], { type: 'game_start', yourColor: 'black', opponentJoined: true });
-    send(room.players[1], { type: 'game_start', yourColor: 'white' });
+    send(room.players[0], { type: 'game_start', roomId: msg.roomId, yourColor: 'black', opponentJoined: true });
+    send(room.players[1], { type: 'game_start', roomId: msg.roomId, yourColor: 'white' });
     return;
   }
 

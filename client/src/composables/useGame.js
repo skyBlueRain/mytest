@@ -13,6 +13,7 @@ const state = reactive({
   inLobby: true,
   lobbyLocked: false,
   restartVoted: false,
+  error: '',
   overlay: { show: false, text: '', sub: '', btn: null },
 })
 
@@ -36,11 +37,14 @@ function send(data) {
 function handleMessage(msg) {
   switch (msg.type) {
     case 'room_created':
+      state.error = ''
       state.roomId = msg.roomId
       state.lobbyLocked = true
       break
 
     case 'game_start':
+      state.error = ''
+      if (msg.roomId) state.roomId = msg.roomId
       state.myColor = msg.yourColor
       state.turn = 1
       state.gameOver = false
@@ -92,39 +96,54 @@ function handleMessage(msg) {
       break
 
     case 'error':
-      break
+      state.error = msg.message || ''
   }
 }
 
+let connectAttempts = 0
+let connectTimer = null
+
 function connect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
   ws = new WebSocket(wsUrl())
-  ws.onopen = () => { state.connected = true }
-  ws.onclose = () => { state.connected = false }
+  state.error = ''
+  ws.onopen = () => {
+    state.connected = true
+    connectAttempts = 0
+  }
+  ws.onclose = () => {
+    state.connected = false
+    state.error = '与服务器断开'
+    if (!state.inLobby && !state.gameOver) {
+      showOverlay('连接已断开', '请刷新页面重试', null)
+    }
+  }
   ws.onmessage = (e) => handleMessage(JSON.parse(e.data))
 }
 
-function createRoom() {
-  if (ws?.readyState !== WebSocket.OPEN) connect()
-  const trySend = () => {
+function sendAfterConnect(msg) {
+  state.error = ''
+  if (ws?.readyState === WebSocket.OPEN) {
+    send(msg)
+    return
+  }
+  connect()
+  const check = () => {
     if (ws?.readyState === WebSocket.OPEN) {
-      send({ type: 'create_room' })
+      send(msg)
     } else {
-      setTimeout(trySend, 200)
+      setTimeout(check, 300)
     }
   }
-  trySend()
+  check()
+}
+
+function createRoom(roomCode) {
+  sendAfterConnect({ type: 'create_room', roomCode })
 }
 
 function joinRoom(roomId) {
-  if (ws?.readyState !== WebSocket.OPEN) connect()
-  const trySend = () => {
-    if (ws?.readyState === WebSocket.OPEN) {
-      send({ type: 'join_room', roomId })
-    } else {
-      setTimeout(trySend, 200)
-    }
-  }
-  trySend()
+  sendAfterConnect({ type: 'join_room', roomId })
 }
 
 function makeMove(row, col) {
@@ -156,6 +175,7 @@ function leave() {
   state.turn = 1
   state.gameOver = false
   state.lastMove = null
+  state.error = ''
   state.board = createBoard()
   state.inLobby = true
   state.lobbyLocked = false

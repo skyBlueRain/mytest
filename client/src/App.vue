@@ -5,7 +5,6 @@ import Lobby from './components/Lobby.vue'
 import GameBoard from './components/GameBoard.vue'
 import GameOverlay from './components/GameOverlay.vue'
 
-
 const { state, connect, leave } = useGame()
 
 onMounted(() => {
